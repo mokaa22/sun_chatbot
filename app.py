@@ -51,13 +51,12 @@ def safe_get(data, *keys):
 
 
 # ---------------------------------
-# KPI Extraction
+# KPI Extraction (UNCHANGED)
 # ---------------------------------
 def extract_kpis(overview_data, system_data, revenue_data):
 
     kpis = {}
 
-    # Inverter %
     total_inv = safe_get(system_data, "totalInverters") or 0
     online_inv = safe_get(system_data, "invertersOnline") or 0
 
@@ -68,7 +67,6 @@ def extract_kpis(overview_data, system_data, revenue_data):
     else:
         kpis["offline_inverter_percent"] = "Unavailable"
 
-    # String %
     total_strings = safe_get(system_data, "totalStrings") or 0
     active_strings = safe_get(system_data, "stringStatus") or 0
 
@@ -79,10 +77,8 @@ def extract_kpis(overview_data, system_data, revenue_data):
     else:
         kpis["string_loss_percent"] = "Unavailable"
 
-    # Grid Status
     kpis["grid_status"] = safe_get(system_data, "gridConnection", "gridStatus") or "Unavailable"
 
-    # Irradiance
     irr_obj = (
         overview_data.get("irradiance")
         or overview_data.get("currentIrradiance")
@@ -94,7 +90,6 @@ def extract_kpis(overview_data, system_data, revenue_data):
     else:
         kpis["irradiance"] = irr_obj if irr_obj else "Unavailable"
 
-    # Generation
     gen_obj = (
         overview_data.get("currentGeneration")
         or overview_data.get("currentPower")
@@ -106,12 +101,24 @@ def extract_kpis(overview_data, system_data, revenue_data):
     else:
         kpis["generation"] = gen_obj if gen_obj else "Unavailable"
 
-    # Revenue
     kpis["todays_revenue"] = revenue_data.get("todaysRevenue") or "Unavailable"
     kpis["monthly_revenue"] = revenue_data.get("monthlyRevenue") or "Unavailable"
     kpis["energy_rate"] = revenue_data.get("energyRate") or "Unavailable"
 
     return kpis
+
+
+# ---------------------------------
+# DOMAIN FILTER (NEW 🔥)
+# ---------------------------------
+def is_solar_related(message):
+    keywords = [
+        "solar", "plant", "generation", "irradiance", "grid",
+        "revenue", "energy", "performance", "pr", "cuf",
+        "loss", "efficiency", "inverter", "string"
+    ]
+    msg = message.lower()
+    return any(word in msg for word in keywords)
 
 
 # ---------------------------------
@@ -134,21 +141,35 @@ def ai_chat():
 
         lower_msg = user_message.lower()
 
+        # ---------------------------------
         # Greeting
+        # ---------------------------------
         greetings = ["hi", "hello", "hey", "good morning", "good afternoon", "good evening"]
         if lower_msg in greetings:
             return jsonify({
                 "reply": "Hi! Welcome to Sunfluence AI Assistant ☀️\nHow can I assist you with your solar plant today?"
             })
 
-        # Small talk
+        # ---------------------------------
+        # Small Talk
+        # ---------------------------------
         small_talk = ["ok", "okay", "got it", "thanks", "thank you", "fine", "cool", "great"]
         if lower_msg in small_talk:
             return jsonify({
                 "reply": "Understood. Let me know if you'd like to analyze any specific parameter."
             })
 
-        # Snapshot Intent
+        # ---------------------------------
+        # ❌ DOMAIN RESTRICTION (NEW 🔥)
+        # ---------------------------------
+        if not is_solar_related(user_message):
+            return jsonify({
+                "reply": "😊 Sorry, I can only assist with solar plant data, performance, and related insights. Please ask something related to your plant."
+            })
+
+        # ---------------------------------
+        # SNAPSHOT
+        # ---------------------------------
         snapshot_keywords = [
             "live plant data",
             "current plant status",
@@ -166,7 +187,6 @@ def ai_chat():
 
             kpis = extract_kpis(overview_data, system_data, revenue_data)
 
-            # Format alerts cleanly
             if isinstance(alerts_data, list) and len(alerts_data) > 0:
                 formatted_alerts = ""
                 for alert in alerts_data:
@@ -193,7 +213,9 @@ Active Alerts:
 """
             return jsonify({"reply": reply.strip()})
 
-        # Analytical Mode (LLM reasoning)
+        # ---------------------------------
+        # ANALYTICAL MODE (LLM)
+        # ---------------------------------
         overview_data = fetch_dashboard_overview() or {}
         system_data = fetch_system_status() or {}
         revenue_data = fetch_revenue_tracking() or {}
@@ -219,7 +241,6 @@ Active Alerts: {alerts_data}
 Respond only to the user's question.
 Do not repeat full snapshot unless asked.
 Do not invent numbers.
-Do not assume plant capacity.
 """
 
         chat_history.append({
