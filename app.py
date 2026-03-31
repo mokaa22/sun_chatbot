@@ -109,13 +109,13 @@ def extract_kpis(overview_data, system_data, revenue_data):
 
 
 # ---------------------------------
-# DOMAIN FILTER (NEW 🔥)
+# Domain Detection
 # ---------------------------------
 def is_solar_related(message):
     keywords = [
         "solar", "plant", "generation", "irradiance", "grid",
         "revenue", "energy", "performance", "pr", "cuf",
-        "loss", "efficiency", "inverter", "string"
+        "loss", "efficiency", "inverter", "string", "alert"
     ]
     msg = message.lower()
     return any(word in msg for word in keywords)
@@ -142,33 +142,25 @@ def ai_chat():
         lower_msg = user_message.lower()
 
         # ---------------------------------
-        # Greeting
+        # Greetings
         # ---------------------------------
-        greetings = ["hi", "hello", "hey", "good morning", "good afternoon", "good evening"]
-        if lower_msg in greetings:
+        greetings = ["hi", "hello", "hey", "how are you", "good morning", "good afternoon", "good evening"]
+        if any(greet in lower_msg for greet in greetings):
             return jsonify({
-                "reply": "Hi! Welcome to Sunfluence AI Assistant ☀️\nHow can I assist you with your solar plant today?"
+                "reply": "Hi! 😊 I'm your Sunfluence AI Assistant. How can I help you with your solar plant?"
             })
 
         # ---------------------------------
         # Small Talk
         # ---------------------------------
-        small_talk = ["ok", "okay", "got it", "thanks", "thank you", "fine", "cool", "great"]
-        if lower_msg in small_talk:
+        small_talk = ["ok", "okay", "got it", "thanks", "thank you", "fine", "cool", "great", "one more"]
+        if any(word in lower_msg for word in small_talk):
             return jsonify({
-                "reply": "Understood. Let me know if you'd like to analyze any specific parameter."
+                "reply": "Sure 👍 Ask me anything about your solar plant."
             })
 
         # ---------------------------------
-        # ❌ DOMAIN RESTRICTION (NEW 🔥)
-        # ---------------------------------
-        if not is_solar_related(user_message):
-            return jsonify({
-                "reply": "😊 Sorry, I can only assist with solar plant data, performance, and related insights. Please ask something related to your plant."
-            })
-
-        # ---------------------------------
-        # SNAPSHOT
+        # Snapshot
         # ---------------------------------
         snapshot_keywords = [
             "live plant data",
@@ -197,24 +189,32 @@ def ai_chat():
                 formatted_alerts = "No active alerts."
 
             reply = f"""
-Here is the current live plant snapshot:
+📊 Live Plant Snapshot:
 
-Offline Inverter %: {kpis['offline_inverter_percent']}%
-String Loss %: {kpis['string_loss_percent']}%
-Grid Status: {kpis['grid_status']}
-Current Irradiance: {kpis['irradiance']} W/m²
-Current Generation: {kpis['generation']} kW
-Today's Revenue: ₹ {kpis['todays_revenue']}
-Monthly Revenue: ₹ {kpis['monthly_revenue']}
-Energy Rate: ₹ {kpis['energy_rate']}/kWh
+⚡ Offline Inverter: {kpis['offline_inverter_percent']}%
+🔻 String Loss: {kpis['string_loss_percent']}%
+🟢 Grid Status: {kpis['grid_status']}
+🌞 Irradiance: {kpis['irradiance']} W/m²
+🔋 Generation: {kpis['generation']} kW
+💰 Today Revenue: ₹ {kpis['todays_revenue']}
+📅 Monthly Revenue: ₹ {kpis['monthly_revenue']}
+⚡ Energy Rate: ₹ {kpis['energy_rate']}/kWh
 
-Active Alerts:
+🚨 Alerts:
 {formatted_alerts}
 """
             return jsonify({"reply": reply.strip()})
 
         # ---------------------------------
-        # ANALYTICAL MODE (LLM)
+        # Domain Restriction (SMART)
+        # ---------------------------------
+        if not is_solar_related(user_message):
+            return jsonify({
+                "reply": "😊 Sorry, I can only assist with solar plant data and performance insights."
+            })
+
+        # ---------------------------------
+        # AI Analytical Mode
         # ---------------------------------
         overview_data = fetch_dashboard_overview() or {}
         system_data = fetch_system_status() or {}
@@ -239,8 +239,8 @@ Energy Rate: {kpis['energy_rate']} ₹/kWh
 Active Alerts: {alerts_data}
 
 Respond only to the user's question.
+Be smart, short, and helpful.
 Do not repeat full snapshot unless asked.
-Do not invent numbers.
 """
 
         chat_history.append({
