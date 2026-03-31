@@ -51,12 +51,13 @@ def safe_get(data, *keys):
 
 
 # ---------------------------------
-# KPI Extraction (UNCHANGED)
+# KPI Extraction
 # ---------------------------------
 def extract_kpis(overview_data, system_data, revenue_data):
 
     kpis = {}
 
+    # Inverter %
     total_inv = safe_get(system_data, "totalInverters") or 0
     online_inv = safe_get(system_data, "invertersOnline") or 0
 
@@ -67,6 +68,7 @@ def extract_kpis(overview_data, system_data, revenue_data):
     else:
         kpis["offline_inverter_percent"] = "Unavailable"
 
+    # String %
     total_strings = safe_get(system_data, "totalStrings") or 0
     active_strings = safe_get(system_data, "stringStatus") or 0
 
@@ -77,8 +79,10 @@ def extract_kpis(overview_data, system_data, revenue_data):
     else:
         kpis["string_loss_percent"] = "Unavailable"
 
+    # Grid Status
     kpis["grid_status"] = safe_get(system_data, "gridConnection", "gridStatus") or "Unavailable"
 
+    # Irradiance
     irr_obj = (
         overview_data.get("irradiance")
         or overview_data.get("currentIrradiance")
@@ -90,6 +94,7 @@ def extract_kpis(overview_data, system_data, revenue_data):
     else:
         kpis["irradiance"] = irr_obj if irr_obj else "Unavailable"
 
+    # Generation
     gen_obj = (
         overview_data.get("currentGeneration")
         or overview_data.get("currentPower")
@@ -101,24 +106,12 @@ def extract_kpis(overview_data, system_data, revenue_data):
     else:
         kpis["generation"] = gen_obj if gen_obj else "Unavailable"
 
+    # Revenue
     kpis["todays_revenue"] = revenue_data.get("todaysRevenue") or "Unavailable"
     kpis["monthly_revenue"] = revenue_data.get("monthlyRevenue") or "Unavailable"
     kpis["energy_rate"] = revenue_data.get("energyRate") or "Unavailable"
 
     return kpis
-
-
-# ---------------------------------
-# Domain Detection
-# ---------------------------------
-def is_solar_related(message):
-    keywords = [
-        "solar", "plant", "generation", "irradiance", "grid",
-        "revenue", "energy", "performance", "pr", "cuf",
-        "loss", "efficiency", "inverter", "string", "alert"
-    ]
-    msg = message.lower()
-    return any(word in msg for word in keywords)
 
 
 # ---------------------------------
@@ -141,27 +134,21 @@ def ai_chat():
 
         lower_msg = user_message.lower()
 
-        # ---------------------------------
-        # Greetings
-        # ---------------------------------
-        greetings = ["hi", "hello", "hey", "how are you", "good morning", "good afternoon", "good evening"]
-        if any(greet in lower_msg for greet in greetings):
+        # Greeting
+        greetings = ["hi", "hello", "hey", "good morning", "good afternoon", "good evening"]
+        if lower_msg in greetings:
             return jsonify({
-                "reply": "Hi! 😊 I'm your Sunfluence AI Assistant. How can I help you with your solar plant?"
+                "reply": "Hi! Welcome to Sunfluence AI Assistant ☀️\nHow can I assist you with your solar plant today?"
             })
 
-        # ---------------------------------
-        # Small Talk
-        # ---------------------------------
-        small_talk = ["ok", "okay", "got it", "thanks", "thank you", "fine", "cool", "great", "one more"]
-        if any(word in lower_msg for word in small_talk):
+        # Small talk
+        small_talk = ["ok", "okay", "got it", "thanks", "thank you", "fine", "cool", "great"]
+        if lower_msg in small_talk:
             return jsonify({
-                "reply": "Sure 👍 Ask me anything about your solar plant."
+                "reply": "Understood. Let me know if you'd like to analyze any specific parameter."
             })
 
-        # ---------------------------------
-        # Snapshot
-        # ---------------------------------
+        # Snapshot Intent
         snapshot_keywords = [
             "live plant data",
             "current plant status",
@@ -189,33 +176,23 @@ def ai_chat():
                 formatted_alerts = "No active alerts."
 
             reply = f"""
-📊 Live Plant Snapshot:
+Here is the current live plant snapshot:
 
-⚡ Offline Inverter: {kpis['offline_inverter_percent']}%
-🔻 String Loss: {kpis['string_loss_percent']}%
-🟢 Grid Status: {kpis['grid_status']}
-🌞 Irradiance: {kpis['irradiance']} W/m²
-🔋 Generation: {kpis['generation']} kW
-💰 Today Revenue: ₹ {kpis['todays_revenue']}
-📅 Monthly Revenue: ₹ {kpis['monthly_revenue']}
-⚡ Energy Rate: ₹ {kpis['energy_rate']}/kWh
+Offline Inverter %: {kpis['offline_inverter_percent']}%
+String Loss %: {kpis['string_loss_percent']}%
+Grid Status: {kpis['grid_status']}
+Current Irradiance: {kpis['irradiance']} W/m²
+Current Generation: {kpis['generation']} kW
+Today's Revenue: ₹ {kpis['todays_revenue']}
+Monthly Revenue: ₹ {kpis['monthly_revenue']}
+Energy Rate: ₹ {kpis['energy_rate']}/kWh
 
-🚨 Alerts:
+Active Alerts:
 {formatted_alerts}
 """
             return jsonify({"reply": reply.strip()})
 
-        # ---------------------------------
-        # Domain Restriction (SMART)
-        # ---------------------------------
-        if not is_solar_related(user_message):
-            return jsonify({
-                "reply": "😊 Sorry, I can only assist with solar plant data and performance insights."
-            })
-
-        # ---------------------------------
-        # AI Analytical Mode
-        # ---------------------------------
+        # Analytical Mode (LLM reasoning)
         overview_data = fetch_dashboard_overview() or {}
         system_data = fetch_system_status() or {}
         revenue_data = fetch_revenue_tracking() or {}
@@ -239,8 +216,9 @@ Energy Rate: {kpis['energy_rate']} ₹/kWh
 Active Alerts: {alerts_data}
 
 Respond only to the user's question.
-Be smart, short, and helpful.
 Do not repeat full snapshot unless asked.
+Do not invent numbers.
+Do not assume plant capacity.
 """
 
         chat_history.append({
